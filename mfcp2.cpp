@@ -1,13 +1,15 @@
+#define _CRT_SECURE_NO_WARNINGS 1
 #define _WIN32_DCOM				// Enables DCOM extensions
 #define INITGUID				// Initialize OLE constants
 
 #include <stdio.h>
 #include <math.h>				// some mathematical function
-#include "afxcmn.h"				// MFC function such as CString,....
+#include <time.h>				// some mathematical function
+//#include "afxcmn.h"				// MFC function such as CString,....
 #include "techgrph.h"			// no comments
 #include "unilog.h"				// universal utilites for creating log-files
 #include <locale.h>				// set russian codepage
-#include <opcda.h>				// basic function for OPC:DA
+#include "opcda.h"				// basic function for OPC:DA
 #include "lightopc.h"			// light OPC library header file
 //#include "serialport.h"			// function for work with Serial Port
 #define ECL_SID "OPC.TG-exe"	// identificator of OPC server
@@ -341,12 +343,12 @@ HRESULT WriteDevice(int device,const unsigned cmdnum,LPSTR data)
 //-----------------------------------------------------------------------------------
 UINT PollDevice(INT portn, INT device)
 {
- INT cnt=0,c0m=0, chff=0, num_bytes=0, startid=0, cnt_false=0;
+ INT cnt=0,c0m=0, chff=0, num_bytes=0, startid=0, cnt_false=0, i=0, y=0;
  const int sBuf[] = {0x3f,0x30,0x30};	// ?00
- UCHAR sBuf1[500],DId[80],ks=0,sBuf2[100];
+ UCHAR sBuf1[500],DId[80],ks=0,sBuf2[100]; 
  CHAR Out[15], *Outt = Out;
  UCHAR *DeviceId = DId,*Int = sBuf1;
- for (INT i=0;i<=2;i++) 	Out[i] = (CHAR) sBuf[i]; 
+ for (i=0;i<=2;i++) 	Out[i] = (CHAR) sBuf[i]; 
  Out[1] = 48+device/10; Out[2] = 48+device%10; Out[3]=0;
  UL_DEBUG((LOGID, "command request ?%d%d",Out[1],Out[2]));
  for (UINT po=0;po<strlen (Out);po++)	WriteFile(hCom[portn], Out+po, 1, &dwBytesWritten, NULL);
@@ -366,14 +368,14 @@ UINT PollDevice(INT portn, INT device)
  if (bcFF_OK)
  for (i=0;i<(INT)dwbr1;i++)
 	{
-	 //UL_DEBUG((LOGID, "byte in %d",sBuf1[i]));
+	 UL_DEBUG((LOGID, "byte in %d",sBuf1[i]));
 	 if (sBuf1[i]==75) 
 		{				 				 
 		 i=i+2;
 		 for (INT rt=0; rt<20; rt++)
 			 if (charset[rt]==sBuf1[i-1])
 				chff=rt;
-	 	 //UL_DEBUG((LOGID, "device:%d kanal %d",device,chff));
+	 	 UL_DEBUG((LOGID, "device:%d kanal %d",device,chff));
 		 INT r=0;
 		 while (sBuf1[i]!=75 && i<cnt && r<6)
 			{
@@ -381,7 +383,7 @@ UINT PollDevice(INT portn, INT device)
 				{
 				 DeviceDataBuffer[portn][device][chff][r] = sBuf1[i];
 				 bcK_OK=TRUE;
-				 //UL_DEBUG((LOGID, "device:%d kanal %d sym: %d = %d",device,chff,r,DeviceDataBuffer[portn][device][chff][r]));
+				 UL_DEBUG((LOGID, "device:%d kanal %d sym: %d = %d",device,chff,r,DeviceDataBuffer[portn][device][chff][r]));
 				 r++; 
 				}
 			 i++;
@@ -391,7 +393,7 @@ UINT PollDevice(INT portn, INT device)
 		 devp[portn]->cv_status[chff+1]=TRUE;
 		}
 	 chff=chNum[portn][device];
-	 for (INT y=0;y<5;y++)	DeviceDataBuffer[portn][device][chff][y]=sBuf1[1+y];
+	 for (y=0;y<5;y++)	DeviceDataBuffer[portn][device][chff][y]=sBuf1[1+y];
 	 for (y=0;y<8;y++)	DeviceDataBuffer[portn][device][chff+1][y]=sBuf1[7+y];
 	 devp[portn]->cv_status[chff]=TRUE;
 	 devp[portn]->cv_status[chff+1]=TRUE;
@@ -486,6 +488,7 @@ UINT InitDriver()
 			 dcb.fInX = FALSE;
 			 SetCommState(hCom[pp], &dcb);
 			 SetCommTimeouts(hCom[pp], &timeouts);
+			 UL_INFO((LOGID, "Opening port success [%d]",pp));	 
 			 DWORD dwErrors;
 			 if (!ClearCommError(hCom[pp], &dwErrors, &comstat))
 				UL_ERROR((LOGID,"Failed in call to ClearCommError"));
@@ -511,13 +514,15 @@ const int sBuf[] = {0x3f,0x30,0x30};	// ?00
 CHAR buf[50]; CHAR *pbuf=buf;
 CHAR Out[50],*Outt=Out,tec[50];
 UINT addr=0;
-INT	 chff=0;
+INT	 chff=0, cport=0;
 DWORD dwStoredFlags = EV_RXCHAR | EV_TXEMPTY | EV_RXFLAG;
 for (UINT ie=0;ie<MAXPORT_NUMBER;ie++)  devp[ie]->idnum = 0;
 //------------------------------------------------------------------------------------
-for (INT cport=0; cport<MAXPORT_NUMBER; cport++) if (b_port[cport])
+UL_INFO((LOGID, "b_port[%d]=%d",cport,b_port[cport]));	// write in log
+for (cport=0; cport<MAXPORT_NUMBER; cport++) if (b_port[cport])
 	for (INT adr=1;adr<=TECHCOM_ID_MAX;adr++)
 		{
+		 UL_INFO((LOGID, "%d %d",cport,adr));	// write in log
 		 sprintf (buf,"Port%d",cport+1);
 		 sprintf (tec,"Tech%d",adr);
 		 Outt = ReadParam (buf,tec);
@@ -616,11 +621,11 @@ INT RegisterTags (VOID)
 {
   FILETIME ft;	//  64-bit value representing the number of 100-ns intervals since January 1,1601
   UINT rights=0;	// tag type (read/write)
-  INT ecode,devi;
+  INT ecode,devi,i;
   GetSystemTimeAsFileTime(&ft);	// retrieves the current system date and time
   EnterCriticalSection(&lk_values);  
   //UL_TRACE((LOGID, "tTotal=%d",tTotal));
-  for (INT i=0; i < tTotal; i++)    
+  for (i=0; i < tTotal; i++)    
 	  tn[i] = new char[TECHCOM_MAX_NAMEL];	// reserve memory for massive  
   i=0;
   for (INT cport=0; cport<MAXPORT_NUMBER; cport++) if (b_port[cport])
